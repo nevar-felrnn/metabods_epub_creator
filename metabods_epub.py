@@ -13,20 +13,24 @@ logging.getLogger().addHandler(logging.StreamHandler())
 
 
 def main(args):
-    # url = 'https://metabods.com/stories/the-black-knights-coming-home'
     url = args.url
     log.info("Using URL: {}".format(url))
     response = requests.get(url)
+    if args.debug:
+        if not os.path.exists(url.split('/')[-1]):
+            with (url.split('/')[-1], 'w+') as f:
+                f.write(response.content)
+        else:
+            with (url.split('/')[-1], 'r') as f:
+                response = f.read()
     soup = BeautifulSoup(response.content, 'lxml')
     title = soup.find('h1', attrs={'class': 'display-4'})
-    # pdb.set_trace()
     log.info("Title is: {}".format(title))
-    # pdb.set_trace()
     author = soup.find_all('h5')[0].text.strip().replace(u'\xa0', u' ')[3:]
     log.info("Author is: {}".format(author))
     chapter_titles = soup.findAll('h5', attrs={"class": "modal-title"})[1:]
     for e in chapter_titles:
-        log.info("Found Chapter: {}".format(e.text))
+        log.info("Found Chapter: {}".format(str(e.text.encode('utf-8'))))
     log.info("Number of chapters found: {}".format(len(chapter_titles)))
     title_string = "{} - by {}".format(str(title.text.strip()), author)
     log.info('Book name is: {}'.format(title_string))
@@ -35,7 +39,6 @@ def main(args):
         try:
             assert chapter_titles[num - 1]
             log.info('Adding: {}#Part_{}'.format(url, num))
-            # pdb.set_trace()
             c = pypub.create_chapter_from_string(
                 "<h1>Part {}</h1>".format(num) + str(z.findNext().find('div', attrs={'class': 'card-body'})),
                 title=chapter_titles[num - 1].text)
@@ -51,5 +54,6 @@ def main(args):
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
     args.add_argument('-u', '--url', help='URL to parse')
+    args.add_argument('-d', '--debug', help='Use debug options', default=False)
     args = args.parse_args()
     main(args)
