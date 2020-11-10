@@ -30,7 +30,7 @@ def main(args):
     author = soup.find_all('h5')[0].text.strip().replace(u'\xa0', u' ')[3:]
     log.info("Author is: {}".format(author))
     # chapter_titles = soup.findAll('h5', attrs={"class": "modal-title"})[1:]
-    chapter_titles = [x.text for x in soup.findAll('div', attrs={"class": "alert alert-info xy_alertheader"})][:-1]
+    chapter_titles = [x.text.strip() for x in soup.findAll('div', attrs={"class": "alert alert-info xy_alertheader"})][:-1]
     for e in chapter_titles:
         log.info("Found Chapter: {}".format(str(e.encode('utf-8'))))
     log.info("Number of chapters found: {}".format(len(chapter_titles)))
@@ -56,12 +56,18 @@ def main(args):
             raise ValueError(e)
         except IndexError:
             pass
-    epub.create_epub(os.getcwd(), epub_name=title_string.replace("  ", " "))
+    output = None
+    if args.output:
+        output = os.path.expanduser(args.output)
+    else:
+        output = os.getcwd()
+    epub.create_epub(output, epub_name=title_string.replace("  ", " "))
 
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
     args.add_argument('-u', '--url', help='URL to parse')
     args.add_argument('-d', '--debug', help='Use debug options', default=False)
+    args.add_argument('-o', '--output', help='Output location', default=os.getcwd())
     args = args.parse_args()
     main(args)
