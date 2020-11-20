@@ -13,7 +13,7 @@ log.setLevel(logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler())
 
 
-def main(url=None, output=None, debug=None, dry_run=None):
+def main(url: str, output: str, debug: bool, series: tuple, dry_run: bool) -> None:
     log.info("Using URL: {}".format(url))
     response = requests.get(url)
     if debug:
@@ -39,17 +39,23 @@ def main(url=None, output=None, debug=None, dry_run=None):
     book = epub.EpubBook()
     book.set_title(title)
     book.add_author(author)
+
+    # Tried adding series info for calibre, doesn't appear that this data is actually stored in the epub maybe?´
+    # if series:
+    #     book.add_metadata(namespace="calibre", name='series', value=series[0])
+    #     book.add_metadata(namespace="calibre", name='series_index', value=str(series[1]))
     spine = ['nav']
     for num, z in enumerate(soup.findAll('div', attrs={"class": "xy_partbg p-4"}), start=0):
         try:
             log.info("Adding: {}#{}".format(url, url_links[num]))
             c = epub.EpubHtml(title=chapter_titles[num], file_name=f"chap_{num}.xhtml")
-            if num == 0:
+            # from pdb import set_trace; set_trace()
+            if z.find('div', attrs={'class': 'xy_overlaytext'}):
                 # This is needed to remove the overlay letter from the page    
-                c.content = f"<h1>Part {num + 1}</h1>\n" if chapter_titles[num] else "" + str(
+                c.content = (f"<h1>{chapter_titles[num]}</h1>\n" if chapter_titles[num] else "") + str(
                     z.find('div', attrs={'class': 'xy_overlaytext'}))
             else:
-                c.content = f"<h1>Part {num + 1}</h1>\n" if chapter_titles[num] else "" + str(
+                c.content = (f"<h1>{chapter_titles[num]}</h1>\n" if chapter_titles[num] else "") + str(
                     z)
             book.add_item(c)
             spine.append(c)
@@ -68,13 +74,13 @@ def main(url=None, output=None, debug=None, dry_run=None):
     book.add_item(epub.EpubNav())
 
     if output:
-        output = os.path.expanduser(args.output)
+        output = os.path.expanduser(output)
     else:
         output = os.getcwd()
     epub.write_epub(os.path.join(output, f"{title}.epub"), book)
 
 
-def series(url=None, output=None, debug=None, dry_run=None):
+def series_processor(url=None, output=None, debug=None, dry_run=None):
     log.info("Using URL: {}".format(url))
     response = requests.get(url)
     if debug:
@@ -85,11 +91,14 @@ def series(url=None, output=None, debug=None, dry_run=None):
             with (url.split('/')[-1], 'r') as f:
                 response = f.read()
     soup = BeautifulSoup(response.content, 'html5lib')
+    series_title = (soup.find('h1').text, None)
+    if series_title:
+        print(f"Series is {series_title}")
     story_list = [x for x in soup.find('ul', attrs={'class': 'list-group list-group-flush'}).findAll('a') if
                   x.attrs['href'].startswith('/mbxy/site/story.php?')]
-    for story in story_list:
-        main(url="http://metabods.com" + story['href'], output=output, debug=debug, dry_run=dry_run)
-
+    for num, story in enumerate(story_list):
+        main(url="http://metabods.com" + story['href'], output=output, debug=debug, series=(series_title, num),
+             dry_run=dry_run)
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
@@ -99,6 +108,6 @@ if __name__ == '__main__':
     args.add_argument('-y', '--dry-run', help="Dry run the script, don't create any files")
     args = args.parse_args()
     if urllib.parse.urlsplit(args.url).query.startswith('list=series&id='):
-        series(url=args.url, output=args.output, debug=args.debug, dry_run=args.dry_run)
+        series_processor(url=args.url, output=args.output, debug=args.debug, dry_run=args.dry_run)
     else:
         main(url=args.url, output=args.output, debug=args.debug, dry_run=args.dry_run)
